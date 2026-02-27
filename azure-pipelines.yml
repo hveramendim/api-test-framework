@@ -1,0 +1,515 @@
+# azure-pipelines.yml  (ALL / TESTCASES / DOMAIN / RISK / ENDPOINT)
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - feature/*
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+# =========================
+# PARAMETERS
+# =========================
+parameters:
+- name: environment
+  displayName: Ambiente
+  type: string
+  default: QA
+  values: [QA, STG]
+
+- name: runScope
+  displayName: Alcance de ejecución
+  type: string
+  default: ALL
+  values: [ALL, TESTCASES, DOMAIN, RISK, ENDPOINT]
+
+- name: testCases
+  displayName: "TestCases (códigos) coma separados (solo si TESTCASES)"
+  type: string
+  default: "NONE"
+
+- name: domain
+  displayName: "Dominio (solo si DOMAIN)"
+  type: string
+  default: "NONE"
+
+- name: risk
+  displayName: "Riesgo (solo si RISK)"
+  type: string
+  default: "NONE"
+  values: ["NONE", "HIGH", "MEDIUM", "LOW"]
+
+- name: endpoint
+  displayName: "EndpointKey (solo si ENDPOINT) ej: GET_/users"
+  type: string
+  default: "NONE"
+
+- name: syncToTestPlans
+  displayName: "🔁 Sincronizar resultado a Azure Test Plans"
+  type: boolean
+  default: false
+
+- name: testPlanTarget
+  displayName: "Destino Test Plans (project|planId|suiteId) solo si sync"
+  type: string
+  default: ""
+
+# =========================
+# VARIABLES
+# =========================
+variables:
+  - group: rp-api-qa
+
+  - name: NODE_VERSION
+    value: "20.x"
+
+  # Root folder where Vitest writes .last-run-dir and runs/*
+  - name: REPORTS_ROOT
+    value: "reports"
+
+  # Subdir of the repo if needed (monorepo). Leave empty for repo root.
+  - name: WORKDIR
+    value: ""
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+- stage: API_Tests
+  displayName: API Automation (Vitest)
+  jobs:
+  - job: Run
+    displayName: Run tests + publish reports
+    steps:
+    - checkout: self
+      clean: true
+
+    - task: NodeTool@0
+      inputs:
+        versionSpec: $(NODE_VERSION)
+      displayName: Use Node $(NODE_VERSION)
+
+    - task: Cache@2
+      displayName: Cache npm
+      inputs:
+        key: 'npm | "$(Agent.OS)" | package-lock.json'
+        restoreKeys: |
+          npm | "$(Agent.OS)"
+        path: $(Pipeline.Workspace)/.npm
+
+    - bash: |
+        set -euo pipefail
+        node -v
+        npm -v
+        echo "WORKDIR='$(WORKDIR)'"
+        echo "REPORTS_ROOT='$(REPORTS_ROOT)'"
+      displayName: Node info
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+        rm -rf node_modules
+      displayName: Clean node_modules (defensive)
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+        npm ci --cache "$(Pipeline.Workspace)/.npm" --prefer-offline --no-audit --no-fund
+      displayName: Install dependencies (npm ci)
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        echo "OS: $(uname -s) ARCH: $(uname -m)"
+        if [ "$(uname -s)" = "Linux" ] && [ "$(uname -m)" = "x86_64" ]; then
+          echo "Applying Rollup Linux native hotfix..."
+          npm i -D @rollup/rollup-linux-x64-gnu --no-audit --no-fund
+        else
+          echo "Not Linux x86_64 -> skipping rollup native hotfix."
+        fi
+      displayName: Hotfix rollup native (linux)
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+        npm rebuild
+      displayName: Rebuild native deps
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+        mkdir -p "$(REPORTS_ROOT)"
+      displayName: Ensure reports root dir
+
+    # =========================
+    # VALIDATE DOMAIN AGAINST REGISTRY (solo si DOMAIN)
+    # =========================
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        SCOPE="${{ parameters.runScope }}"
+        DOMAIN="${{ parameters.domain }}"
+        DOMAIN="$(echo "$DOMAIN" | tr -d ' ')"
+        if [ "$DOMAIN" = "NONE" ]; then DOMAIN=""; fi
+
+        if [ "$SCOPE" = "DOMAIN" ]; then
+          echo "Validando dominio: $DOMAIN"
+          node scripts/validate-domain.mjs "$DOMAIN"
+        else
+          echo "Scope != DOMAIN -> skip validación de dominio"
+        fi
+      displayName: Validate domain against registry
+
+    # =========================
+    # COMPUTE FILTER (ALL / TESTCASES / DOMAIN / RISK / ENDPOINT)
+    # =========================
+    - bash: |
+        set -euo pipefail
+
+        ENVIRONMENT="${{ parameters.environment }}"
+        SCOPE="${{ parameters.runScope }}"
+
+        TESTCASES_RAW="${{ parameters.testCases }}"
+        DOMAIN_RAW="${{ parameters.domain }}"
+        RISK_RAW="${{ parameters.risk }}"
+        ENDPOINT_RAW="${{ parameters.endpoint }}"
+
+        TESTCASES_RAW="$(echo "$TESTCASES_RAW" | tr -d ' ')"
+        DOMAIN_RAW="$(echo "$DOMAIN_RAW" | tr -d ' ')"
+        RISK_RAW="$(echo "$RISK_RAW" | tr -d ' ')"
+        ENDPOINT_RAW="$(echo "$ENDPOINT_RAW" | tr -d ' ')"
+
+        if [ "$TESTCASES_RAW" = "NONE" ]; then TESTCASES_RAW=""; fi
+        if [ "$DOMAIN_RAW" = "NONE" ]; then DOMAIN_RAW=""; fi
+        if [ "$RISK_RAW" = "NONE" ]; then RISK_RAW=""; fi
+        if [ "$ENDPOINT_RAW" = "NONE" ]; then ENDPOINT_RAW=""; fi
+
+        echo "Environment: $ENVIRONMENT"
+        echo "Run scope: $SCOPE"
+        echo "testCases: $TESTCASES_RAW"
+        echo "domain: $DOMAIN_RAW"
+        echo "risk: $RISK_RAW"
+        echo "endpoint: $ENDPOINT_RAW"
+
+        FILTER=""
+
+        if [ "$SCOPE" = "TESTCASES" ]; then
+          if [ -z "$TESTCASES_RAW" ]; then
+            echo "❌ runScope=TESTCASES pero testCases está vacío. Envíe: @TC-123,@TC-456,..."
+            exit 1
+          fi
+
+          # Build regex: \[@TC-1\]|\[@TC-2\]
+          LIST="$(echo "$TESTCASES_RAW" | sed 's/,/ /g')"
+          REGEX=""
+          for tc in $LIST; do
+            tc="$(echo "$tc" | xargs)"
+            [ -z "$tc" ] && continue
+            if [ -z "$REGEX" ]; then
+              REGEX="\\[${tc}\\]"
+            else
+              REGEX="${REGEX}|\\[${tc}\\]"
+            fi
+          done
+          FILTER="$REGEX"
+          echo "Computed filter (TESTCASES): $FILTER"
+
+        elif [ "$SCOPE" = "DOMAIN" ]; then
+          if [ -z "$DOMAIN_RAW" ]; then
+            echo "❌ runScope=DOMAIN pero domain está vacío. Envíe: playground_users, payments, parking, ..."
+            exit 1
+          fi
+          FILTER="\\[DOMAIN:${DOMAIN_RAW}\\]"
+          echo "Computed filter (DOMAIN): $FILTER"
+
+        elif [ "$SCOPE" = "RISK" ]; then
+          if [ -z "$RISK_RAW" ]; then
+            echo "❌ runScope=RISK pero risk está vacío."
+            exit 1
+          fi
+          FILTER="\\[RISK:${RISK_RAW}\\]"
+          echo "Computed filter (RISK): $FILTER"
+
+        elif [ "$SCOPE" = "ENDPOINT" ]; then
+          if [ -z "$ENDPOINT_RAW" ]; then
+            echo "❌ runScope=ENDPOINT pero endpoint está vacío. Ej: GET_/users"
+            exit 1
+          fi
+          # Normalize spaces to underscores to match qaTest convention
+          ENDPOINT_NORM="$(echo "$ENDPOINT_RAW" | tr ' ' '_' )"
+          FILTER="\\[EP:${ENDPOINT_NORM}\\]"
+          echo "Computed filter (ENDPOINT): $FILTER"
+
+        else
+          echo "Scope ALL -> sin filtro"
+        fi
+
+        echo "##vso[task.setvariable variable=ENVIRONMENT]$ENVIRONMENT"
+        echo "##vso[task.setvariable variable=FILTER]$FILTER"
+        echo "##vso[task.setvariable variable=TESTCASES_RAW]$TESTCASES_RAW"
+        echo "##vso[task.setvariable variable=DOMAIN_RAW]$DOMAIN_RAW"
+        echo "##vso[task.setvariable variable=RISK_RAW]$RISK_RAW"
+        echo "##vso[task.setvariable variable=ENDPOINT_RAW]$ENDPOINT_RAW"
+      displayName: Compute filter
+
+    # =========================
+    # RUN TESTS (Vitest config writes dynamic run folder)
+    # =========================
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        echo "Running tests..."
+
+        export TEST_ENV="$(ENVIRONMENT)"
+        export ENV="$(echo "$(ENVIRONMENT)" | tr '[:upper:]' '[:lower:]')"
+
+        echo "TEST_ENV=$TEST_ENV"
+        echo "ENV=$ENV"
+        echo "FILTER=$(FILTER)"
+
+        set +e
+        if [ -n "$(FILTER)" ]; then
+          echo "Running filtered: npx vitest run -t \"$(FILTER)\" ..."
+          npx vitest run -t "$(FILTER)"
+        else
+          echo "Running full: npx vitest run ..."
+          npx vitest run
+        fi
+        EXIT_CODE=$?
+        set -e
+
+        echo "Vitest exit code: $EXIT_CODE"
+        echo "##vso[task.setvariable variable=VITEST_EXIT_CODE]$EXIT_CODE"
+        exit 0
+      displayName: Run Vitest (capture exit code)
+
+    # =========================
+    # RESOLVE RUN DIR + JUNIT PATH (from reports/.last-run-dir)
+    # =========================
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        LAST="$(REPORTS_ROOT)/.last-run-dir"
+        if [ -f "$LAST" ]; then
+          RUN_DIR="$(cat "$LAST" | tr -d '\r\n')"
+        else
+          RUN_DIR="$(REPORTS_ROOT)"
+        fi
+
+        echo "Resolved RUN_DIR=$RUN_DIR"
+
+        JUNIT="$RUN_DIR/junit/results.xml"
+        echo "Resolved JUNIT_PATH=$JUNIT"
+
+        if [ ! -f "$JUNIT" ]; then
+          echo "❌ JUnit not found at: $JUNIT"
+          echo "Listing RUN_DIR:"
+          ls -la "$RUN_DIR" || true
+          echo "Listing RUN_DIR/junit:"
+          ls -la "$RUN_DIR/junit" || true
+          exit 1
+        fi
+
+        echo "##vso[task.setvariable variable=RUN_DIR]$RUN_DIR"
+        echo "##vso[task.setvariable variable=REPORTS_DIR]$RUN_DIR"
+        echo "##vso[task.setvariable variable=JUNIT_PATH]$JUNIT"
+      displayName: Resolve runDir + JUnit path
+      condition: succeededOrFailed()
+
+    # Debug (helps avoid "why is it uploading reports/summary.md?")
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+        echo "RUN_DIR=$(RUN_DIR)"
+        echo "REPORTS_DIR=$(REPORTS_DIR)"
+        echo "JUNIT_PATH=$(JUNIT_PATH)"
+        echo "System.DefaultWorkingDirectory=$(System.DefaultWorkingDirectory)"
+        echo "List reports root:"
+        ls -la "$(REPORTS_ROOT)" || true
+        echo "List resolved reports dir:"
+        ls -la "$(REPORTS_DIR)" || true
+      displayName: Debug resolved paths
+      condition: succeededOrFailed()
+
+    # =========================
+    # POSTPROCESS JUNIT (STRIP SKIPPED)
+    # =========================
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        if [ ! -f "$(JUNIT_PATH)" ]; then
+          echo "⚠️ JUnit not found at $(JUNIT_PATH). Skipping strip-skipped."
+          exit 0
+        fi
+
+        echo "Saving raw JUnit for audit..."
+        cp "$(JUNIT_PATH)" "$(REPORTS_DIR)/junit.raw.xml" || true
+
+        echo "Post-processing JUnit: removing skipped testcases..."
+        node scripts/junit-strip-skipped.mjs "$(JUNIT_PATH)"
+      displayName: "Postprocess JUnit (strip skipped)"
+      condition: succeededOrFailed()
+
+    - task: PublishTestResults@2
+      displayName: Publish JUnit results
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: JUnit
+        testResultsFiles: $(JUNIT_PATH)
+        testRunTitle: "API Tests - ${{ parameters.environment }}"
+        failTaskOnFailedTests: false
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish reports artifact
+      condition: succeededOrFailed()
+      inputs:
+        targetPath: $(REPORTS_DIR)
+        artifact: api-test-reports-${{ parameters.environment }}-$(Build.BuildId)
+
+    # =========================
+    # BUILD + UPLOAD SUMMARY (Azure Summary tab)
+    # =========================
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        if [ ! -f "$(JUNIT_PATH)" ]; then
+          echo "⚠️ JUnit not found at $(JUNIT_PATH). Skipping summary."
+          exit 0
+        fi
+
+        export TEST_ENV="$(ENVIRONMENT)"
+        export RUN_SCOPE="${{ parameters.runScope }}"
+        export FILTER="$(FILTER)"
+
+        node scripts/build-summary.mjs "$(JUNIT_PATH)" "$(REPORTS_DIR)/summary.md"
+
+        echo "Summary generated at: $(REPORTS_DIR)/summary.md"
+        ls -la "$(REPORTS_DIR)/summary.md" || true
+      displayName: "Build Summary (Markdown)"
+      condition: succeededOrFailed()
+
+    - bash: |
+        set -euo pipefail
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        echo "REPORTS_DIR=$(REPORTS_DIR)"
+        echo "JUNIT_PATH=$(JUNIT_PATH)"
+
+        SUMMARY_ABS="$(System.DefaultWorkingDirectory)/$(REPORTS_DIR)/summary.md"
+        echo "Trying upload: $SUMMARY_ABS"
+
+        if [ ! -f "$SUMMARY_ABS" ]; then
+          echo "⚠️ Summary file not found at $SUMMARY_ABS. Skipping upload."
+          echo "Listing resolved reports dir:"
+          ls -la "$(System.DefaultWorkingDirectory)/$(REPORTS_DIR)" || true
+          exit 0
+        fi
+
+        echo "##vso[task.uploadsummary]$SUMMARY_ABS"
+      displayName: "Upload Summary to Azure"
+      condition: succeededOrFailed()
+
+    # =========================
+    # UPDATE TEST PLANS
+    # =========================
+    - bash: |
+        set -euo pipefail
+
+        SYNC="${{ parameters.syncToTestPlans }}"
+        TARGET="${{ parameters.testPlanTarget }}"
+        ENVIRONMENT="${{ parameters.environment }}"
+        TESTCASES_RAW="${{ parameters.testCases }}"
+        DOMAIN_RAW="${{ parameters.domain }}"
+        RISK_RAW="${{ parameters.risk }}"
+        ENDPOINT_RAW="${{ parameters.endpoint }}"
+        SCOPE="${{ parameters.runScope }}"
+
+        TESTCASES_RAW="$(echo "$TESTCASES_RAW" | tr -d ' ')"
+        DOMAIN_RAW="$(echo "$DOMAIN_RAW" | tr -d ' ')"
+        RISK_RAW="$(echo "$RISK_RAW" | tr -d ' ')"
+        ENDPOINT_RAW="$(echo "$ENDPOINT_RAW" | tr -d ' ')"
+
+        if [ "$TESTCASES_RAW" = "NONE" ]; then TESTCASES_RAW=""; fi
+        if [ "$DOMAIN_RAW" = "NONE" ]; then DOMAIN_RAW=""; fi
+        if [ "$RISK_RAW" = "NONE" ]; then RISK_RAW=""; fi
+        if [ "$ENDPOINT_RAW" = "NONE" ]; then ENDPOINT_RAW=""; fi
+
+        if [ "$SYNC" != "true" ]; then
+          echo "Sync a Test Plans desactivado."
+          exit 0
+        fi
+
+        if [ -z "$TARGET" ]; then
+          echo "❌ testPlanTarget vacío. Formato requerido: project|planId|suiteId"
+          exit 1
+        fi
+
+        IFS='|' read -r TARGET_PROJECT TESTPLAN_ID TESTSUITE_ID <<< "$TARGET"
+        if [ -z "${TARGET_PROJECT:-}" ] || [ -z "${TESTPLAN_ID:-}" ] || [ -z "${TESTSUITE_ID:-}" ]; then
+          echo "❌ testPlanTarget inválido. Usa: project|planId|suiteId  (ej: QA-Automation|123|456)"
+          exit 1
+        fi
+
+        MODE="PLAN_SUITE"
+        if [ "$SCOPE" = "TESTCASES" ] && [ -n "$TESTCASES_RAW" ]; then
+          MODE="TESTCASES"
+        elif [ "$SCOPE" = "DOMAIN" ] && [ -n "$DOMAIN_RAW" ]; then
+          MODE="DOMAIN"
+        elif [ "$SCOPE" = "RISK" ] && [ -n "$RISK_RAW" ]; then
+          MODE="RISK"
+        elif [ "$SCOPE" = "ENDPOINT" ] && [ -n "$ENDPOINT_RAW" ]; then
+          MODE="ENDPOINT"
+        fi
+
+        echo "Sync válido."
+        echo "Mode: $MODE"
+        echo "Project: $TARGET_PROJECT"
+        echo "Plan: $TESTPLAN_ID"
+        echo "Suite: $TESTSUITE_ID"
+        echo "Environment: $ENVIRONMENT"
+        echo "TestCases: $TESTCASES_RAW"
+        echo "Domain: $DOMAIN_RAW"
+        echo "Risk: $RISK_RAW"
+        echo "Endpoint: $ENDPOINT_RAW"
+        echo "JUnit: $(JUNIT_PATH)"
+        echo "ReportsDir: $(REPORTS_DIR)"
+
+        if [ -n "$(WORKDIR)" ]; then cd "$(WORKDIR)"; fi
+
+        node scripts/update-azure-testplan.js \
+          --targetProject "$TARGET_PROJECT" \
+          --environment "$ENVIRONMENT" \
+          --mode "$MODE" \
+          --testPlanId "$TESTPLAN_ID" \
+          --testSuiteId "$TESTSUITE_ID" \
+          --testCases "$TESTCASES_RAW" \
+          --domain "$DOMAIN_RAW" \
+          --risk "$RISK_RAW" \
+          --endpoint "$ENDPOINT_RAW" \
+          --junit "$(JUNIT_PATH)" \
+          --reportsDir "$(REPORTS_DIR)"
+      displayName: Update Azure Test Plans
+      condition: and(succeededOrFailed(), ne(variables['Build.Reason'], 'PullRequest'))
+      env:
+        AZDO_ORG_URL: $(AZDO_ORG_URL)
+        AZDO_PAT: $(AZDO_PAT)
+
+    - bash: |
+        set -euo pipefail
+        echo "Failing job if tests failed. VITEST_EXIT_CODE=$(VITEST_EXIT_CODE)"
+        if [ "$(VITEST_EXIT_CODE)" != "0" ]; then
+          echo "Some tests failed."
+          exit 1
+        fi
+      displayName: Fail pipeline if tests failed

@@ -1,0 +1,31 @@
+{
+  "name": "api-test-framework",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pretest:qa": "node scripts/mkdir-reports.mjs",
+    "test:qa": "cross-env ENV=qa vitest run --config vitest.config.ts",
+    "dashboard": "node scripts/generate-dashboard.mjs",
+    "serve:reports": "node scripts/generate-dashboard.mjs && npx http-server reports -p 4173 -c-1 -o /index.html",
+    "reports:qa": "npm run test:qa & npm run dashboard & npm run serve:reports",
+    "test:ci": "vitest run --reporter=junit --outputFile=reports/junit.xml",
+    "test:file": "cross-env ENV=qa vitest run"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "axios": "^1.13.4",
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.7",
+    "@vitest/runner": "2.1.9",
+    "@vitest/ui": "^2.1.9",
+    "allure-commandline": "^2.36.0",
+    "allure-js-commons": "^3.4.5",
+    "allure-vitest": "^3.4.5",
+    "cross-env": "^7.0.3",
+    "typescript": "^5.9.3",
+    "vitest": "2.1.9"
+  }
+}
