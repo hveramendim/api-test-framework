@@ -5,6 +5,8 @@ import { clients } from "../../../config/clients";
 import type { CreateWithArrayRequest } from "../models/createWithArray.request.model";
 import type { CreateWithArrayResponse } from "../models/createWithArray.response.model";
 import type { PetStoreApiResponse } from "../models/shared/api-response.model";
+import { LoginUserRequest } from "../models/loginUser.request.model";
+import { LoginUserResponse } from "../models/loginUser.response.model";
 
 export class PetStoreUserService {
   constructor(private readonly http: HttpClient = clients.petStore) {}
@@ -26,4 +28,10 @@ export class PetStoreUserService {
     return this.http.delete<PetStoreApiResponse>(`/user/${username}`, opts);
   }
   
+  loginUser(credentials: LoginUserRequest, opts?: HttpRequestOptions) {
+    return this.http.get<LoginUserResponse>(`/user/login`, {
+      params: credentials as Record<string, any>,
+      ...opts,
+    });
+  }
 }
