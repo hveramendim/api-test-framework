@@ -19,7 +19,7 @@ describe("Pet Store Users API - Login User", () => {
     });
 
     qaTest(
-        "LU-HP-01 - Loguearse exitosamente con usuario creado",
+        "LU-HP-01 - Login de usuario existente",
         {
             tags: ["@LU-HP-01"],
             risk: "LOW",
@@ -32,6 +32,34 @@ describe("Pet Store Users API - Login User", () => {
             expect(res.status).toBe(200);
             expect(res.data.code).toBe(res.status);
             assertLoginUserContract(res.data);
+
+            // Pending to assert headers contract when it's implemented in the service
+            const headers = res.headers;
+            console.log(headers);
+            expect(headers).toHaveProperty("x-rate-limit");
+            expect(headers).toHaveProperty("x-expires-after");
+
+            expect(typeof headers["x-expires-after"]).toBe("string");
+            expect(typeof headers["x-rate-limit"]).toBe("string");
+
+            expect(Number(headers["x-rate-limit"])).toBeGreaterThanOrEqual(0);
+            expect(headers["x-expires-after"].length).toBeGreaterThan(0);
+        }
+    );
+
+    qaTest(
+        "LU-UHP-01 - Login de usuario no existente",
+        {
+            tags: ["@LU-UHP-01"],
+            risk: "LOW",
+            endpointKey: "GET /user/login",
+            domain: "pet_store",
+        },
+        async () => {
+            const user = { username: "user2", password: "1234" } as LoginUserRequest;
+            const res = await petStoreUserService.loginUser(user);
+            expect(res.status).toBe(404);
+            expect(res.data.code).toBe(res.status);
         }
     );
 });
