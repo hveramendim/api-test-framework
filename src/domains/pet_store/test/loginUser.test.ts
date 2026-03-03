@@ -14,7 +14,7 @@ describe("Pet Store Users API - Login User", () => {
 
     beforeAll(async () => {
         // Crear usuario 'user1' antes de los tests GET
-        const user = PetStoreUserBuilder.valid({ username: "user1", password: "1234" });
+        const user = PetStoreUserBuilder.valid({ username: "testi1", password: "testi1" });
         await petStoreUserService.createWithArray([user]);
     });
 
@@ -27,7 +27,7 @@ describe("Pet Store Users API - Login User", () => {
             domain: "pet_store",
         },
         async () => {
-            const user = { username: "user1", password: "1234" } as LoginUserRequest;
+            const user = { username: "testi1", password: "testi1" } as LoginUserRequest;
             const res = await petStoreUserService.loginUser(user);
             expect(res.status).toBe(200);
             expect(res.data.code).toBe(res.status);
@@ -56,10 +56,62 @@ describe("Pet Store Users API - Login User", () => {
             domain: "pet_store",
         },
         async () => {
-            const user = { username: "user2", password: "1234" } as LoginUserRequest;
+            const user = { username: "testi3", password: "testi3" } as LoginUserRequest;
             const res = await petStoreUserService.loginUser(user);
             expect(res.status).toBe(404);
             expect(res.data.code).toBe(res.status);
+            assertLoginUserContract(res.data);
+        }
+    );
+
+    qaTest(
+        "LU-NEG-01 - Login de usuario con campos requeridos vacíos",
+        {
+            tags: ["@LU-NEG-01"],
+            risk: "LOW",
+            endpointKey: "GET /user/login",
+            domain: "pet_store",
+        },
+        async () => {
+            const user = { username: "", password: "" } as LoginUserRequest;
+            const res = await petStoreUserService.loginUser(user);
+            expect(res.status).toBe(404);
+            expect(res.data.code).toBe(res.status);
+            assertLoginUserContract(res.data);
+        }
+    );
+
+    qaTest(
+        "LU-NEG-02 - Login de usuario con campo username vacío",
+        {
+            tags: ["@LU-NEG-02"],
+            risk: "LOW",
+            endpointKey: "GET /user/login",
+            domain: "pet_store",
+        },
+        async () => {
+            const user = { username: "", password: "testi2" } as LoginUserRequest;
+            const res = await petStoreUserService.loginUser(user);
+            expect(res.status).toBe(404);
+            expect(res.data.code).toBe(res.status);
+            assertLoginUserContract(res.data);
+        }
+    );
+
+    qaTest(
+        "LU-NEG-03 - Login de usuario con campo password vacío",
+        {
+            tags: ["@LU-NEG-03"],
+            risk: "LOW",
+            endpointKey: "GET /user/login",
+            domain: "pet_store",
+        },
+        async () => {
+            const user = { username: "testi2", password: "" } as LoginUserRequest;
+            const res = await petStoreUserService.loginUser(user);
+            expect(res.status).toBe(404);
+            expect(res.data.code).toBe(res.status);
+            assertLoginUserContract(res.data);
         }
     );
 });
