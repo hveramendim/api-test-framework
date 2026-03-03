@@ -22,7 +22,7 @@ describe("Pet Store Users API - Login User", () => {
         "LU-HP-01 - Login de usuario existente",
         {
             tags: ["@LU-HP-01"],
-            risk: "LOW",
+            risk: "HIGH",
             endpointKey: "GET /user/login",
             domain: "pet_store",
         },
@@ -51,7 +51,7 @@ describe("Pet Store Users API - Login User", () => {
         "LU-UHP-01 - Login de usuario no existente",
         {
             tags: ["@LU-UHP-01"],
-            risk: "LOW",
+            risk: "HIGH",
             endpointKey: "GET /user/login",
             domain: "pet_store",
         },
@@ -68,7 +68,7 @@ describe("Pet Store Users API - Login User", () => {
         "LU-NEG-01 - Login de usuario con campos requeridos vacíos",
         {
             tags: ["@LU-NEG-01"],
-            risk: "LOW",
+            risk: "HIGH",
             endpointKey: "GET /user/login",
             domain: "pet_store",
         },
@@ -85,7 +85,7 @@ describe("Pet Store Users API - Login User", () => {
         "LU-NEG-02 - Login de usuario con campo username vacío",
         {
             tags: ["@LU-NEG-02"],
-            risk: "LOW",
+            risk: "HIGH",
             endpointKey: "GET /user/login",
             domain: "pet_store",
         },
@@ -102,7 +102,7 @@ describe("Pet Store Users API - Login User", () => {
         "LU-NEG-03 - Login de usuario con campo password vacío",
         {
             tags: ["@LU-NEG-03"],
-            risk: "LOW",
+            risk: "HIGH",
             endpointKey: "GET /user/login",
             domain: "pet_store",
         },
