@@ -7,6 +7,9 @@ import type { CreateWithArrayResponse } from "../models/createWithArray.response
 import type { PetStoreApiResponse } from "../models/shared/api-response.model";
 import type { PetStoreUser } from "../models/getByUsername.model";
 
+import { LoginUserRequest } from "../models/loginUser.request.model";
+import { LoginUserResponse } from "../models/loginUser.response.model";
+
 export class PetStoreUserService {
   constructor(private readonly http: HttpClient = clients.petStore) {}
 
@@ -62,4 +65,10 @@ export class PetStoreUserService {
     );
   }
   
+  loginUser(credentials: LoginUserRequest, opts?: HttpRequestOptions) {
+    return this.http.get<LoginUserResponse>(`/user/login`, {
+      params: credentials as Record<string, any>,
+      ...opts,
+    });
+  }
 }
