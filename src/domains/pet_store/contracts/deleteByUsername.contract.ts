@@ -2,6 +2,7 @@ import { expect } from "vitest";
 import type { DeleteUserResponse } from "../models/shared/api-response.model";
 
 export function assertDeleteUserContract(data: DeleteUserResponse) {
+  
   expect(data).toHaveProperty("code");
   expect(data).toHaveProperty("type");
   expect(data).toHaveProperty("message");

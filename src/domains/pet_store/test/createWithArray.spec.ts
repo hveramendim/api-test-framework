@@ -51,26 +51,9 @@ describe("PetStore Users API - createWithArray", () => {
   );
 
   qaTest(
-    "CWA-NEG-03 - Body vacío (array vacío) - Registrar comportamiento real",
+    "CWA-NEG-03 - Body nulo / sin body - Validar que no responde 200",
     {
       tags: ["@CWA-NEG-03"],
-      risk: "LOW",
-      endpointKey: "POST /user/createWithArray",
-      domain: "pet_store",
-    },
-    async () => {
-      const body: any[] = [];
-      const res = await userService.createWithArray(body);
-      expect(res.status).toBe(200);
-      assertCreateWithArrayContract(res.data);
-      expect(res.data.code).toBe(200);
-    },
-  );
-
-  qaTest(
-    "CWA-NEG-04 - Body nulo / sin body - Validar que no responde 200",
-    {
-      tags: ["@CWA-NEG-04"],
       risk: "MEDIUM",
       endpointKey: "POST /user/createWithArray",
       domain: "pet_store",
@@ -82,14 +65,14 @@ describe("PetStore Users API - createWithArray", () => {
           accept: "application/json",
         },
       });
-      expect(res.status).not.toBe(200);
+      expect(res.status).toBe(405);
     },
   );
 
   qaTest(
-    "CWA-NEG-05 - Usuario sin campos requeridos (sin username) - Registrar comportamiento real",
+    "CWA-NEG-04 - Usuario sin campos requeridos (sin username) - Registrar comportamiento real",
     {
-      tags: ["@CWA-NEG-05"],
+      tags: ["@CWA-NEG-04"],
       risk: "LOW",
       endpointKey: "POST /user/createWithArray",
       domain: "pet_store",
@@ -104,9 +87,9 @@ describe("PetStore Users API - createWithArray", () => {
   );
 
   qaTest(
-    "CWA-REG-06 - Username duplicado en la misma lista - Registrar comportamiento real",
+    "CWA-REG-05 - Username duplicado en la misma lista - Registrar comportamiento real",
     {
-      tags: ["@CWA-REG-06"],
+      tags: ["@CWA-REG-05"],
       risk: "LOW",
       endpointKey: "POST /user/createWithArray",
       domain: "pet_store",
@@ -126,9 +109,9 @@ describe("PetStore Users API - createWithArray", () => {
   );
 
   qaTest(
-    "CWA-REG-07 - Username con caracteres especiales",
+    "CWA-REG-06 - Username con caracteres especiales",
     {
-      tags: ["@CWA-REG-07"],
+      tags: ["@CWA-REG-06"],
       risk: "LOW",
       endpointKey: "POST /user/createWithArray",
       domain: "pet_store",

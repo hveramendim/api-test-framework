@@ -3,13 +3,6 @@
 import { expect } from "vitest";
 import type { CreateWithArrayResponse } from "../models/createWithArray.response.model";
 
-/**
- * Contract-Based Testing
- * Valida estructura mínima esperada del endpoint
- * POST /user/createWithArray
- *
- * No valida reglas de negocio.
- */
 export function assertCreateWithArrayContract(
   data: CreateWithArrayResponse
 ) {
