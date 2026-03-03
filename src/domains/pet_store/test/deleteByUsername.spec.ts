@@ -26,7 +26,7 @@ describe("PetStore Users API - DELETE /user/{username}", () => {
 
       // Acción: eliminar usuario
       const delRes = await userService.deleteUser(String(user.username));
-       console.log("REQUEST:" + JSON.stringify(delRes))
+
       // Protocolo
       expect(delRes.status).toBe(200);
 
@@ -66,8 +66,8 @@ describe("PetStore Users API - DELETE /user/{username}", () => {
       domain: "pet_store",
     },
     async () => {
-      // Caso whitespace: llega como path param pero puede variar el status
-      const username = encodeURIComponent("   "); // %20%20%20
+
+      const username = encodeURIComponent("   ");
 
       const delRes = await userService.deleteUser(username);
 

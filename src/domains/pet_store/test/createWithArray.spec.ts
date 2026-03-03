@@ -20,9 +20,9 @@ describe("PetStore Users API - createWithArray", () => {
     },
     async () => {
       const body = PetStoreUserBuilder.many(2);
-      //console.log("REQUEST:" + JSON.stringify(body))
+
       const res = await userService.createWithArray(body);
-      //console.log("REQUEST:" + JSON.stringify(res))
+
       expect(res.status).toBe(200);
       assertCreateWithArrayContract(res.data);
 
