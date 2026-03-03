@@ -1,7 +1,7 @@
 // src/domains/pet_store/contracts/users.contract.ts
 
 import { expect } from "vitest";
-import type { PetStoreUser } from "../models/users.types";
+import type { PetStoreUser } from "../models/getByUsername.model";
 
 export function assertPetStoreUserContract(user: PetStoreUser) {
   expect(user).toHaveProperty("id");
