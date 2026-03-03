@@ -25,5 +25,17 @@ export class PetStoreUserService {
   deleteUser( username: string, opts?: HttpRequestOptions) {
     return this.http.delete<PetStoreApiResponse>(`/user/${username}`, opts);
   }
+
+  createWithList( users: CreateWithArrayRequest, opts?: HttpRequestOptions) {
+    return this.http.post<CreateWithArrayResponse>(`/user/createWithList`, users,
+      {
+        headers: {
+          "Content-Type": "application/json",
+          accept: "application/json",
+        },
+        ...opts,
+      }
+    );
+  }
   
 }
