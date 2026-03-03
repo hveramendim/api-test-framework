@@ -5,7 +5,7 @@ import { clients } from "../../../config/clients";
 import type { CreateWithArrayRequest } from "../models/createWithArray.request.model";
 import type { CreateWithArrayResponse } from "../models/createWithArray.response.model";
 import type { PetStoreApiResponse } from "../models/shared/api-response.model";
-import type { PetStoreUser } from "../models/users.types";
+import type { PetStoreUser } from "../models/getByUsername.model";
 
 export class PetStoreUserService {
   constructor(private readonly http: HttpClient = clients.petStore) {}
