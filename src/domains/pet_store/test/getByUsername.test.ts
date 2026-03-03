@@ -3,7 +3,7 @@ import { PetStoreUserService } from "../services/petStoreUser.service";
 import { clients } from "../../../config/clients";
 import { qaTest } from "../../../core/testing/qaTest";
 import { PetStoreUserBuilder } from "../models/builders/user.builder";
-import { assertPetStoreUserContract } from "../contracts/users.contract";
+import { assertPetStoreUserContract } from "../contracts/getByUsername.contract";
 
 describe("Pet Store Users API", () => {
   const userService = new PetStoreUserService(clients.petStore);
